@@ -4,9 +4,12 @@ from tavily import TavilyClient
 from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import StrOutputParser
+from dotenv import load_dotenv  
 
-HF_TOKEN    = ""
-TAVILY_KEY  = ""
+load_dotenv()
+
+HF_TOKEN    = os.getenv("HF_TOKEN")
+TAVILY_KEY  = os.getenv("TAVILY_KEY")   
 
 os.environ["HF_TOKEN"]                 = HF_TOKEN
 os.environ["TAVILY_API_KEY"]           = TAVILY_KEY
@@ -131,17 +134,12 @@ def get_verdict(title: str, evidence: dict) -> dict:
         "explanation": explanation,
     }
 
-
 def verify_article(title: str) -> dict:
     print(f"\n{'='*60}")
     print(f"Title: {title[:80]}")
     print(f"{'='*60}")
-
-
     evidence = get_evidence(title)
-
     verdict  = get_verdict(title, evidence)
-
     return {
         "title":       title,
         "query":       evidence["query"],
