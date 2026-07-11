@@ -4,13 +4,7 @@ import joblib
 FEATURES  = ["vreg", "eireg_anger", "eireg_fear", "eireg_joy", "eireg_sadness"]
 MODEL_PATH = "models/affect_classifier.pkl"
 
-
 pipe = joblib.load(MODEL_PATH)
-print(f"Model loaded from {MODEL_PATH}")
-
-# ─────────────────────────────────────────
-# PREDICT FUNCTION
-# ─────────────────────────────────────────
 def predict_from_affect(scores: dict) -> dict:
     """
     Input:  dict with keys vreg, eireg_anger, eireg_fear, eireg_joy, eireg_sadness
@@ -32,12 +26,12 @@ def predict_from_affect(scores: dict) -> dict:
     }
 
 
-if __name__ == "__main__":
-    sample = {
-        "vreg":          0.391,
-        "eireg_anger":   0.458,
-        "eireg_fear":    0.458,
-        "eireg_joy":     0.200,
-        "eireg_sadness": 0.421
-    }
-    print(f"Sample result: {predict_from_affect(sample)}")
+# if __name__ == "__main__":
+#     sample = {
+#         "vreg":          0.391,
+#         "eireg_anger":   0.458,
+#         "eireg_fear":    0.458,
+#         "eireg_joy":     0.200,
+#         "eireg_sadness": 0.421
+#     }
+#     print(f"Sample result: {predict_from_affect(sample)}")
