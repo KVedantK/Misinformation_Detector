@@ -9,7 +9,6 @@ from scipy.spatial.distance import cdist
 
 df = pd.read_csv("fakenewsnet_with_affect.csv")
 
-# Feature set — the 5 affective dimensions
 FEATURES = ["vreg", "eireg_anger", "eireg_fear", "eireg_joy", "eireg_sadness"]
 
 X = df[FEATURES].values

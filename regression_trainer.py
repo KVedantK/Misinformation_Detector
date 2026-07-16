@@ -35,9 +35,7 @@ print(f"  Accuracy  {scores['test_accuracy'].mean():.4f} ± {scores['test_accura
 print(f"  Precision {scores['test_precision_weighted'].mean():.4f}")
 print(f"  Recall    {scores['test_recall_weighted'].mean():.4f}")
 
-# ─────────────────────────────────────────
-# FIT ON FULL DATA + FEATURE WEIGHTS
-# ─────────────────────────────────────────
+
 pipe.fit(X, y)
 
 print("\nFeature weights:")
@@ -46,14 +44,10 @@ for feat, c in sorted(zip(FEATURES, coef), key=lambda x: abs(x[1]), reverse=True
     direction = "→ FAKE" if c > 0 else "→ REAL"
     print(f"  {feat:<20} {c:>8.4f}  {direction}")
 
-# Full classification report on training data
 y_pred = pipe.predict(X)
 print("\nClassification Report (full training set):")
 print(classification_report(y, y_pred, target_names=["real", "fake"]))
 
-# ─────────────────────────────────────────
-# SAVE MODEL
-# ─────────────────────────────────────────
 os.makedirs("models", exist_ok=True)
 joblib.dump(pipe, "models/affect_classifier.pkl")
 print("Saved → models/affect_classifier.pkl")
