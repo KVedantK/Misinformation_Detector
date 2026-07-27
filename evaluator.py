@@ -9,19 +9,27 @@ from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
+import glob
+from langchain_groq import ChatGroq
+from langchain_openai import ChatOpenAI
+import pandas as pd
+from tqdm import tqdm
+from sklearn.metrics import (accuracy_score, precision_score,
+                             recall_score, f1_score, classification_report)
 
 load_dotenv()
 
 # ─────────────────────────────────────────
 # CONFIG
 # ─────────────────────────────────────────
-EMOLLAMA_PATH = "./emollama_gguf/Emollama-7b.Q4_K_M.gguf"
+EMOLLAMA_PATH = "../MSc_Project/emollama_gguf/Emollama-7b.Q4_K_M.gguf"
 MODEL_PATH    = "models/affect_classifier.pkl"
 FEATURES      = ["vreg", "eireg_anger", "eireg_fear", "eireg_joy", "eireg_sadness"]
 
 os.environ["HF_TOKEN"]                 = os.getenv("HF_TOKEN")
 os.environ["TAVILY_API_KEY"]           = os.getenv("TAVILY_KEY")
 os.environ["HUGGINGFACEHUB_API_TOKEN"] = os.environ["HF_TOKEN"]
+os.environ["GROQ_API_KEY"]              = os.getenv("GROQ_KEY")
 
 # ─────────────────────────────────────────
 # LOAD MODELS (once at startup)
@@ -40,18 +48,28 @@ pipe = joblib.load(MODEL_PATH)
 print("Loading Tavily + LLM chain...")
 tavily_client = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
 
-llm_web = ChatHuggingFace(
-    llm=HuggingFaceEndpoint(
-        repo_id="meta-llama/Llama-3.3-70B-Instruct",
-        provider="auto",
-        huggingfacehub_api_token=os.environ["HF_TOKEN"],
-        max_new_tokens=800,
-        temperature=0.01,
-        timeout=120,
-    ),
-    verbose=False
+
+llm_web = ChatOpenAI(
+    model="meta-llama/llama-3.3-70b-instruct",
+    openai_api_key=os.getenv("OPEN_ROUTER_KEY"),
+    openai_api_base="https://openrouter.ai/api/v1",
+    temperature=0.01,
+    max_tokens=800,
 )
 web_chain = llm_web | StrOutputParser()
+
+# llm_web = ChatHuggingFace(
+#     llm=HuggingFaceEndpoint(
+#         repo_id="meta-llama/Llama-3.3-70B-Instruct",
+#         provider="auto",
+#         huggingfacehub_api_token=os.environ["HF_TOKEN"],
+#         max_new_tokens=800,
+#         temperature=0.01,
+#         timeout=120,
+#     ),
+#     verbose=False
+# )
+# web_chain = llm_web | StrOutputParser()
 
 print("All models loaded ✓\n")
 
@@ -346,22 +364,166 @@ def evaluate_article(text: str) -> dict:
 # ═════════════════════════════════════════
 # MAIN — test on sample article
 # ═════════════════════════════════════════
+# ═════════════════════════════════════════
+# BATCH EVALUATION — folder-based dataset
+# fakeNewsDataset/
+#   fake/   *.txt  → actual_label = fake
+#   legit/  *.txt  → actual_label = real
+# ═════════════════════════════════════════
+
+
+
+DATASET_PATH  = "training/training/fakeNewsDataset/"          # folder containing fake/ and legit/
+CHECKPOINT    = "eval_checkpoint_llama.csv"
+FINAL_REPORT  = "evaluation_report.csv"
+
+def load_all_files(dataset_path: str) -> list[dict]:
+    """
+    Walk fake/ and legit/ folders and return list of
+    {filename, actual_label, text} dicts.
+    """
+    files = []
+
+    for label, folder in [("fake", "fake"), ("real", "legit")]:
+        folder_path = os.path.join(dataset_path, folder)
+        if not os.path.exists(folder_path):
+            print(f"  WARNING: folder not found — {folder_path}")
+            continue
+        for filepath in sorted(glob.glob(os.path.join(folder_path, "*.txt"))):
+            try:
+                with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                    text = f.read().strip()
+                files.append({
+                    "filename":     os.path.basename(filepath),
+                    "actual_label": label,
+                    "text":         text,
+                })
+            except Exception as e:
+                print(f"  Could not read {filepath}: {e}")
+
+    print(f"Loaded {len(files)} files "
+          f"({sum(1 for f in files if f['actual_label']=='fake')} fake, "
+          f"{sum(1 for f in files if f['actual_label']=='real')} real)")
+    return files
+
+
 if __name__ == "__main__":
 
-    sample = """
-    Trump Just Made A Campaign Promise So Ridiculous It Makes Read My Lips Look Good.
-    Trump just promised to destroy the existential threat of terrorism in America.
-    He promised to destroy all terrorists and end terrorism on our soil without any
-    specific plan for counter-terrorism funding or internet recruitment prevention.
-    """
+    all_files = load_all_files(DATASET_PATH)
 
-    result = evaluate_article(sample)
+    # ── Resume from checkpoint ──
+    done_files = set()
+    results    = []
 
-    print("\n" + "="*60)
-    print("FULL RESULT SUMMARY")
-    print("="*60)
-    print(f"Affective scores:    vreg={result['vreg']:.3f}  anger={result['eireg_anger']:.3f}  fear={result['eireg_fear']:.3f}")
-    print(f"Affect prediction:   {result['affect_pred']} ({result['affect_confidence']:.4f})")
-    print(f"Web verdict:         {result['web_verdict']} ({result['web_confidence']:.2f})")
-    print(f"Web explanation:     {result['web_explanation']}")
-    print(f"Final prediction:    {result['final_prediction'].upper()} ({result['final_confidence']:.4f})")
+    if os.path.exists(CHECKPOINT):
+        done_df    = pd.read_csv(CHECKPOINT)
+        done_files = set(done_df["filename"].tolist())
+        results    = done_df.to_dict("records")
+        print(f"Resuming — {len(done_files)} already done, "
+              f"{len(all_files) - len(done_files)} remaining")
+    else:
+        print("Starting fresh")
+
+    # ── Run pipeline on each file ──
+    for item in tqdm(all_files, desc="Evaluating"):
+
+        if item["filename"] in done_files:
+            continue
+
+        try:
+            result = evaluate_article(item["text"])
+            correct = (result["final_prediction"] == item["actual_label"])
+
+            row = {
+                # Identity
+                "filename":          item["filename"],
+                "actual_label":      item["actual_label"],
+                # Final prediction
+                "final_prediction":  result["final_prediction"],
+                "final_confidence":  result["final_confidence"],
+                "correct":           correct,
+                # Affective scores
+                "vreg":              result["vreg"],
+                "eireg_anger":       result["eireg_anger"],
+                "eireg_fear":        result["eireg_fear"],
+                "eireg_joy":         result["eireg_joy"],
+                "eireg_sadness":     result["eireg_sadness"],
+                # Logistic regression
+                "affect_pred":       result["affect_pred"],
+                "affect_confidence": result["affect_confidence"],
+                "p_fake":            result["p_fake"],
+                # Web verification
+                "web_verdict":       result["web_verdict"],
+                "web_confidence":    result["web_confidence"],
+                "web_explanation":   result["web_explanation"],
+                "web_query":         result["web_query"],
+                # Fusion internals
+                "p_fake_affect":     result["p_fake_affect"],
+                "p_fake_web":        result["p_fake_web"],
+                "combined_p_fake":   result["combined_p_fake"],
+            }
+
+        except Exception as e:
+            print(f"  ERROR on {item['filename']}: {e}")
+            row = {
+                "filename":         item["filename"],
+                "actual_label":     item["actual_label"],
+                "final_prediction": "ERROR",
+                "final_confidence": 0.0,
+                "correct":          False,
+                "web_verdict":      "ERROR",
+                "web_explanation":  str(e),
+            }
+
+        results.append(row)
+        done_files.add(item["filename"])
+
+        # Checkpoint every 10 files
+        if len(results) % 10 == 0:
+            pd.DataFrame(results).to_csv(CHECKPOINT, index=False)
+            print(f"  Checkpoint saved — {len(results)} done")
+        
+
+    # ── Save full report ──
+    report_df = pd.DataFrame(results)
+    report_df.to_csv(FINAL_REPORT, index=False)
+    print(f"\nSaved → {FINAL_REPORT}")
+
+    # ── Metrics (exclude ERROR rows) ──
+    clean = report_df[report_df["final_prediction"] != "ERROR"].copy()
+    y_true = (clean["actual_label"]     == "fake").astype(int)
+    y_pred = (clean["final_prediction"] == "fake").astype(int)
+
+    print("\n" + "="*55)
+    print("EVALUATION RESULTS")
+    print("="*55)
+    print(f"  Total files:   {len(report_df)}")
+    print(f"  Errors:        {(report_df['final_prediction']=='ERROR').sum()}")
+    print(f"  Evaluated:     {len(clean)}")
+    print(f"\n  Accuracy:      {accuracy_score(y_true, y_pred):.4f}")
+    print(f"  F1 (weighted): {f1_score(y_true, y_pred, average='weighted'):.4f}")
+    print(f"  Precision:     {precision_score(y_true, y_pred, average='weighted'):.4f}")
+    print(f"  Recall:        {recall_score(y_true, y_pred, average='weighted'):.4f}")
+
+    print("\nDetailed report:")
+    print(classification_report(y_true, y_pred, target_names=["real","fake"]))
+
+    # ── Breakdown by affect vs web agent ──
+    print("="*55)
+    print("AGENT BREAKDOWN")
+    print("="*55)
+    if "affect_pred" in clean.columns:
+        y_affect = (clean["affect_pred"] == "fake").astype(int)
+        print(f"  Affect-only F1:  {f1_score(y_true, y_affect, average='weighted'):.4f}")
+
+    if "web_verdict" in clean.columns:
+        web_clean = clean[clean["web_verdict"].isin(["SUPPORTED","CONTRADICTED"])].copy()
+        if len(web_clean) > 0:
+            y_true_web = (web_clean["actual_label"] == "fake").astype(int)
+            # CONTRADICTED = predicted fake, SUPPORTED = predicted real
+            y_web = (web_clean["web_verdict"] == "CONTRADICTED").astype(int)
+            print(f"  Web-only F1:     {f1_score(y_true_web, y_web, average='weighted'):.4f}")
+            print(f"  Web coverage:    {len(web_clean)}/{len(clean)} articles "
+                  f"({100*len(web_clean)/len(clean):.1f}%)")
+
+    print(f"\n  Combined F1:     {f1_score(y_true, y_pred, average='weighted'):.4f}")
