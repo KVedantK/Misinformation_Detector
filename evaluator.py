@@ -48,28 +48,27 @@ pipe = joblib.load(MODEL_PATH)
 print("Loading Tavily + LLM chain...")
 tavily_client = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
 
+## mistralai/mistral-small-3.2-24b-instruct
 
 llm_web = ChatOpenAI(
-    model="meta-llama/llama-3.3-70b-instruct",
+    model="qwen/qwen3-8b",
     openai_api_key=os.getenv("OPEN_ROUTER_KEY"),
     openai_api_base="https://openrouter.ai/api/v1",
     temperature=0.01,
     max_tokens=800,
 )
-web_chain = llm_web | StrOutputParser()
 
-# llm_web = ChatHuggingFace(
-#     llm=HuggingFaceEndpoint(
-#         repo_id="meta-llama/Llama-3.3-70B-Instruct",
-#         provider="auto",
-#         huggingfacehub_api_token=os.environ["HF_TOKEN"],
-#         max_new_tokens=800,
-#         temperature=0.01,
-#         timeout=120,
-#     ),
-#     verbose=False
+## Llama 
+# llm_web = ChatOpenAI(
+#     model="meta-llama/llama-3.3-70b-instruct",
+#     openai_api_key=os.getenv("OPEN_ROUTER_KEY"),
+#     openai_api_base="https://openrouter.ai/api/v1",
+#     temperature=0.01,
+#     max_tokens=800,
 # )
-# web_chain = llm_web | StrOutputParser()
+
+
+web_chain = llm_web | StrOutputParser()
 
 print("All models loaded ✓\n")
 
@@ -374,8 +373,8 @@ def evaluate_article(text: str) -> dict:
 
 
 DATASET_PATH  = "training/training/fakeNewsDataset/"          # folder containing fake/ and legit/
-CHECKPOINT    = "eval_checkpoint_llama.csv"
-FINAL_REPORT  = "evaluation_report.csv"
+CHECKPOINT    = "eval_checkpoint_mistral.csv"
+FINAL_REPORT  = "evaluation_report_mistral.csv"
 
 def load_all_files(dataset_path: str) -> list[dict]:
     """
