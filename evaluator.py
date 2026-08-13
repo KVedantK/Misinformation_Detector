@@ -51,9 +51,9 @@ tavily_client = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
 ## mistralai/mistral-small-3.2-24b-instruct
 
 llm_web = ChatOpenAI(
-    model="llama-3.1-8b-instant",
-    openai_api_key=os.getenv("GROQ_KEY"),
-    openai_api_base="https://api.groq.com/openai/v1",
+    model="meta-llama/Llama-3.1-8B-Instruct",
+    openai_api_key=os.getenv("HF_TOKEN"),
+    openai_api_base="https://router.huggingface.co/v1",
     temperature=0.01,
     max_tokens=800,
 )
@@ -373,8 +373,8 @@ def evaluate_article(text: str) -> dict:
 
 
 DATASET_PATH  = "training/training/fakeNewsDataset/"          # folder containing fake/ and legit/
-CHECKPOINT    = "Data_Folder_CSVs/eval_checkpoint_llama_8B.csv"
-FINAL_REPORT  = "Data_Folder_CSVs/evaluation_report_llama_8B.csv"
+CHECKPOINT    = "Data_Folder_CSVs/eval_checkpoint_llama_8B_HF_INFERENCE.csv"
+FINAL_REPORT  = "Data_Folder_CSVs/evaluation_report_llama_8B_HF_INFERENCE.csv"
 
 def load_all_files(dataset_path: str) -> list[dict]:
     """
@@ -425,7 +425,7 @@ if __name__ == "__main__":
 
     # ── Run pipeline on each file ──
     for item in tqdm(all_files, desc="Evaluating"):
-
+        print("###################### ITEM IS ", item)
         if item["filename"] in done_files:
             continue
 
