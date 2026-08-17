@@ -20,19 +20,21 @@ SOURCE_CSV   = "./Data_Folder_CSVs/ready_data.csv"
 SOURCE_EMB   = "./Data_Folder_CSVs/fakenewsnet_embeddings.npy"
 TOP_K        = 4
 TASK_PROMPT  = "Determine whether the target text is 0. Fake or 1. Legit."
-OUT_CSV      = "raemollm_results.csv"
+OUT_CSV      = "raemollm_results_llama_3-70B.csv"
 
 # ── models ──────────────────────────────────────────────
 llm_emo = Llama(model_path="../MSc_Project/emollama_gguf/Emollama-7b.Q4_K_M.gguf",
                  n_ctx=2048, n_gpu_layers=-1, embedding=True, verbose=False)
 
 llm_mistral = ChatOpenAI(
-    model="meta-llama/Llama-3.1-8B-Instruct",
+    model="meta-llama/Llama-3.3-70B-Instruct",
     openai_api_key=os.getenv("HF_TOKEN"),
     openai_api_base="https://router.huggingface.co/v1",
     temperature=0.01,
     max_tokens=800,
 )
+
+
 
 # ── retrieval source pool ───────────────────────────────
 src_df = pd.read_csv(SOURCE_CSV)
