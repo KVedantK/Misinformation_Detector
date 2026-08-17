@@ -20,19 +20,20 @@ SOURCE_CSV   = "./Data_Folder_CSVs/ready_data.csv"
 SOURCE_EMB   = "./Data_Folder_CSVs/fakenewsnet_embeddings.npy"
 TOP_K        = 4
 TASK_PROMPT  = "Determine whether the target text is 0. Fake or 1. Legit."
-OUT_CSV      = "raemollm_results_llama_3-70B.csv"
+OUT_CSV      = "raemollm_results_qwen_3_8B.csv"
 
 # ── models ──────────────────────────────────────────────
 llm_emo = Llama(model_path="../MSc_Project/emollama_gguf/Emollama-7b.Q4_K_M.gguf",
                  n_ctx=2048, n_gpu_layers=-1, embedding=True, verbose=False)
 
 llm_mistral = ChatOpenAI(
-    model="meta-llama/Llama-3.3-70B-Instruct",
+    model="Qwen/Qwen3-8B",
     openai_api_key=os.getenv("HF_TOKEN"),
     openai_api_base="https://router.huggingface.co/v1",
     temperature=0.01,
     max_tokens=800,
 )
+
 
 
 
@@ -136,7 +137,7 @@ for item in tqdm(items):
     result = process(item)
     rows.append(result)
     pd.DataFrame(rows).to_csv(OUT_CSV, index=False)  # checkpoint every item
-    time.sleep(2)  # be nice to the API
+    #time.sleep(1)  # be nice to the API
 
 df = pd.DataFrame(rows)
 for tmpl in ["template1", "template2"]:

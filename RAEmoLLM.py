@@ -34,6 +34,8 @@ llm_mistral = ChatOpenAI(
     max_tokens=800,
 )
 
+
+
 # ── retrieval source pool ───────────────────────────────
 src_df = pd.read_csv(SOURCE_CSV)
 src_emb = np.load(SOURCE_EMB)
