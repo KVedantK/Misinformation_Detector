@@ -86,28 +86,55 @@ def load_files(path):
                 items.append({"filename": os.path.basename(fp), "actual_label": label, "text": f.read()})
     return items
 
-# ── main loop ────────────────────────────────────────────
+# ── main loop (resumable, retries ERROR rows) ────────────
 items = load_files(DATASET_PATH)
+
+# Load prior checkpoint if present, keyed by filename.
+done_map = {}
+if os.path.exists(OUT_CSV):
+    prev = pd.read_csv(OUT_CSV)
+    done_map = {r["filename"]: r.to_dict() for _, r in prev.iterrows()}
+    n_ok = sum(1 for r in done_map.values() if r.get("template1_pred") != "ERROR")
+    print(f"Resuming: {len(done_map)} rows in checkpoint ({n_ok} clean, "
+          f"{len(done_map) - n_ok} to retry). {len(items) - len(done_map)} not yet started.")
+
+MAX_RETRIES = 3
+
+def process(item):
+    """Runs one article through both templates, retrying transient/rate-limit failures."""
+    last_err = None
+    for attempt in range(MAX_RETRIES):
+        try:
+            examples = retrieve(item["text"])
+            vreg = get_vreg(item["text"])
+            p1 = ask(template1(item["text"], examples))
+            p2 = ask(template2(item["text"], vreg, examples))
+            return {"filename": item["filename"], "actual_label": item["actual_label"],
+                    "vreg": round(vreg, 4),
+                    "template1_pred": p1, "template2_pred": p2,
+                    "template1_correct": p1 == item["actual_label"],
+                    "template2_correct": p2 == item["actual_label"]}
+        except Exception as e:
+            last_err = e
+            wait = 10 * (attempt + 1)  # 10s, 20s, 30s backoff — helps ride out rate limits
+            print(f"  retry {attempt + 1}/{MAX_RETRIES} for {item['filename']} after error: {e} "
+                  f"(waiting {wait}s)")
+            time.sleep(wait)
+    print(f"ERROR {item['filename']} (gave up after {MAX_RETRIES} tries): {last_err}")
+    return {"filename": item["filename"], "actual_label": item["actual_label"],
+            "template1_pred": "ERROR", "template2_pred": "ERROR"}
+
 rows = []
 for item in tqdm(items):
-    try:
-        examples = retrieve(item["text"])
-        vreg = get_vreg(item["text"])
-        p1 = ask(template1(item["text"], examples))
-        p2 = ask(template2(item["text"], vreg, examples))
-        rows.append({"filename": item["filename"], "actual_label": item["actual_label"],
-                      "vreg": round(vreg, 4),
-                      "template1_pred": p1, "template2_pred": p2,
-                      "template1_correct": p1 == item["actual_label"],
-                      "template2_correct": p2 == item["actual_label"]})
-    except Exception as e:
-        print(f"ERROR {item['filename']}: {e}")
-        rows.append({"filename": item["filename"], "actual_label": item["actual_label"],
-                      "template1_pred": "ERROR", "template2_pred": "ERROR"})
-    
+    prior = done_map.get(item["filename"])
+    if prior is not None and prior.get("template1_pred") != "ERROR" and prior.get("template2_pred") != "ERROR":
+        rows.append(prior)  # already have a clean result, skip re-processing
+        continue
+
+    result = process(item)
+    rows.append(result)
     pd.DataFrame(rows).to_csv(OUT_CSV, index=False)  # checkpoint every item
     time.sleep(2)  # be nice to the API
-
 
 df = pd.DataFrame(rows)
 for tmpl in ["template1", "template2"]:
