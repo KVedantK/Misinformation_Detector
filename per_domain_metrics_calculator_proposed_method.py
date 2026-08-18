@@ -2,8 +2,8 @@ import sys, re
 import pandas as pd
 from sklearn.metrics import accuracy_score, f1_score
 
-IN_CSV = "/workspaces/Misinformation_Detector/Data_Folder_CSVs/eval_checkpoint_llama_3.3_70B.csv"
-MODEL_NAME = "Llama 3.3 70B"
+IN_CSV = "/workspaces/Misinformation_Detector/Data_Folder_CSVs/eval_checkpoint_qwen_3_8B.csv"
+MODEL_NAME = "Qwen 3 8B"
 
 # filename prefix -> domain name (extend if you have other prefixes)
 DOMAIN_MAP = {
