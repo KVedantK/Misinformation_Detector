@@ -6,8 +6,8 @@ from sklearn.metrics import (
     f1_score
 )
 
-LLAMA_FILE = "/workspaces/Misinformation_Detector/Data_Folder_CSVs/eval_checkpoint_llama.csv"
-MISTRAL_FILE = "/workspaces/Misinformation_Detector/Data_Folder_CSVs/eval_checkpoint_mistral.csv"
+LLAMA_370B_FILE = "/workspaces/Misinformation_Detector/Data_Folder_CSVs/eval_checkpoint_llama_3.3_70B.csv"
+QWEN_FILE = "/workspaces/Misinformation_Detector/Data_Folder_CSVs/eval_checkpoint_qwen_3_8B.csv"
 LLAMA_3_8B_FILE = "/workspaces/Misinformation_Detector/Data_Folder_CSVs/eval_checkpoint_llama_8B_HF_INFERENCE.csv"
 
 
@@ -61,8 +61,8 @@ def evaluate_component(df, model_name, component, affect_weight, web_weight):
 
 
 
-llama = pd.read_csv(LLAMA_FILE)
-mistral = pd.read_csv(MISTRAL_FILE)
+llama_370B = pd.read_csv(LLAMA_370B_FILE)
+qwen_3_8B = pd.read_csv(QWEN_FILE)
 llama_3_8B = pd.read_csv(LLAMA_3_8B_FILE)
 
 
@@ -100,7 +100,7 @@ results.append(
 
 results.append(
     evaluate_component(
-        llama,
+        llama_370B,
         "Llama-3.3-70B",
         "Affect-only",
         affect_weight=1.0,
@@ -110,7 +110,7 @@ results.append(
 
 results.append(
     evaluate_component(
-        llama,
+        llama_370B,
         "Llama-3.3-70B",
         "Web-only",
         affect_weight=0.0,
@@ -120,7 +120,7 @@ results.append(
 
 results.append(
     evaluate_component(
-        llama,
+        llama_370B,
         "Llama-3.3-70B",
         "Combined (0.4 affect + 0.6 web)",
         affect_weight=0.4,
@@ -131,8 +131,8 @@ results.append(
 
 results.append(
     evaluate_component(
-        mistral,
-        "Mistral (checkpoint 2)",
+        qwen_3_8B,
+        "Qwen-3-8B",
         "Affect-only",
         affect_weight=1.0,
         web_weight=0.0
@@ -141,8 +141,8 @@ results.append(
 
 results.append(
     evaluate_component(
-        mistral,
-        "Mistral (checkpoint 2)",
+        qwen_3_8B,
+        "Qwen-3-8B",
         "Web-only",
         affect_weight=0.0,
         web_weight=1.0
@@ -151,8 +151,8 @@ results.append(
 
 results.append(
     evaluate_component(
-        mistral,
-        "Mistral (checkpoint 2)",
+        qwen_3_8B,
+        "Qwen-3-8B",
         "Combined (0.4 affect + 0.6 web)",
         affect_weight=0.4,
         web_weight=0.6
